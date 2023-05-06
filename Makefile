@@ -6,7 +6,7 @@ RPC_SYSTEM=rpc.o
 all: $(RPC_SYSTEM)
 
 $(RPC_SYSTEM): rpc.c rpc.h
-	$(CC) -c -o $@ $<
+	$(CC) -c -Wall -o $@ $<
 
 # RPC_SYSTEM_A=rpc.a
 # $(RPC_SYSTEM_A): rpc.o

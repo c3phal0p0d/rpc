@@ -1,3 +1,5 @@
+// cc -o server.o server.c rpc.o utils.o
+
 #include "rpc.h"
 #include <assert.h>
 #include <stdio.h>

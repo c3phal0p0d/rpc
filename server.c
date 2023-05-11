@@ -1,4 +1,4 @@
-// cc -o client.o client.c rpc.o utils.o
+// cc -o client.o client.c rpc.o
 
 #include "rpc.h"
 #include <assert.h>

@@ -1,24 +1,25 @@
+#define _POSIX_C_SOURCE 200112L
 #include <netdb.h> 
-#include <string.h> 
+#include <strings.h> 
+#include <string.h>
 #include <stdio.h> 
-#include <unistd.h> 
 #include <stdlib.h>
+#include <unistd.h> 
 #include "rpc.h"
-#include "utils.h"
 
 struct rpc_server {
-    struct sockaddr_in* address;
+    struct sockaddr_in6* address;
     int sockfd;
 };
 
+int setup_server_socket(int port);
+int setup_client_socket(char* hostname, const int port);
+
 rpc_server *rpc_init_server(int port) {
     // Initialize socket
-    char buffer[2048];
-    struct sockaddr_in address;
     int sockfd, newsockfd;
-    int n;
 
-    sockfd = setup_server_socket(port, &address);
+    sockfd = setup_server_socket(port);
 
     // Listen on socket for connections
     if (listen(sockfd, 5) < 0) {
@@ -35,30 +36,19 @@ rpc_server *rpc_init_server(int port) {
         }
 
         // Read from client
-        n = read(newsockfd, buffer, 2047);
-        if (n == 0) {
-            close(newsockfd);
-            continue;
-        }
-        if (n < 0) {
-            perror("read");
-            exit(EXIT_FAILURE);
-        }
-        buffer[n] = '\0';
-
-        printf("%s\n", buffer);
-
         // TODO: perform different actions depending on input from client
 
         close(newsockfd);
     }
 
-    rpc_server server = {
-        .address = &address,
-        .sockfd = sockfd
-    };
+    printf("Server initiated\n");
 
-    return &server;
+    // rpc_server server = {
+    //     .address = &address,
+    //     .sockfd = sockfd
+    // };
+
+    return NULL;
 }
 
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
@@ -78,28 +68,12 @@ struct rpc_handle {
 };
 
 rpc_client *rpc_init_client(char *addr, int port) {
-    struct sockaddr_in server_address;
     int sockfd;
-    char buffer[256];
 
-    while (1) {
-        // Make connection
-        sockfd = setup_client_socket(port, &server_address);
-        if (connect(sockfd, (struct sockaddr*)&server_address, sizeof(server_address)) <0) {
-            perror("connect");
-            exit(EXIT_FAILURE);
-        }
+    sockfd = setup_client_socket(addr, port);
+    printf("Client initiated\n");
 
-        printf("Enter command: ");
-        if (!fgets(buffer, 255, stdin)) {
-            break;
-        }
-        strtok(buffer, "\n");
-
-        // TODO: validate input based on type of action
-
-        close(sockfd);
-    }
+	close(sockfd);
 
     return NULL;
 }
@@ -124,4 +98,94 @@ void rpc_data_free(rpc_data *data) {
         free(data->data2);
     }
     free(data);
+}
+
+
+/* Adapted from workshop 9 code */
+/* Create and return a server socket bound to the given port */
+int setup_server_socket(const int port) {
+    int re, s, sockfd;
+	struct addrinfo hints, *res;
+
+	// Create address
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;     // for bind, listen, accept
+
+    // Get addrinfo
+    char service[snprintf(NULL, 0, "%d", port) + 1];
+    sprintf(service, "%d", port);
+	s = getaddrinfo(NULL, service, &hints, &res);
+
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		exit(EXIT_FAILURE);
+	}
+
+	// Create socket
+	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (sockfd < 0) {
+		perror("socket");
+		exit(EXIT_FAILURE);
+	}
+
+	// Reuse port if possible
+	re = 1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
+		perror("setsockopt");
+		exit(EXIT_FAILURE);
+	}
+	// Bind address to the socket
+	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
+		perror("bind");
+		exit(EXIT_FAILURE);
+	}
+    
+	freeaddrinfo(res);
+
+    return sockfd;
+}
+
+/* Create and return a client socket bound to the given port and server */
+int setup_client_socket(char* hostname, const int port) {
+    int sockfd, s;
+	struct addrinfo hints, *servinfo, *rp;
+
+    // Create address
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+
+	// Get addrinfo of server
+    char service[snprintf(NULL, 0, "%d", port) + 1];
+    sprintf(service, "%d", port);
+    printf("hostname: %s\n", hostname);
+	s = getaddrinfo(hostname, service, &hints, &servinfo);
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		exit(EXIT_FAILURE);
+	}
+
+	// Connect to first valid result
+	for (rp = servinfo; rp != NULL; rp = rp->ai_next) {
+		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sockfd == -1){
+            printf("not valid\n");
+            continue;
+        }
+
+		if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) != -1)
+			break;
+
+		close(sockfd);
+	}
+	if (rp == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		exit(EXIT_FAILURE);
+	}
+
+	freeaddrinfo(servinfo);
+
+    return sockfd;
 }

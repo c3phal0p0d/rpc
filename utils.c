@@ -9,32 +9,41 @@
 
 /* Create and return a server socket bound to the given port */
 int setup_server_socket(const int port, struct sockaddr_in* address) {
-    int sockfd;
+    int re, s, sockfd;
+	struct addrinfo hints, *res;
 
-    // Create socket
-    sockfd = socket(PF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
+	// Create address we're going to listen on (with given port number)
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET;       // IPv4
+	hints.ai_socktype = SOCK_STREAM; // Connection-mode byte streams
+	hints.ai_flags = AI_PASSIVE;     // for bind, listen, accept
+	// node (NULL means any interface), service (port), hints, res
+	s = getaddrinfo(NULL, service, &hints, &res);
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		exit(EXIT_FAILURE);
+	}
 
-    // Create listen address for given port number for all IP addresses of this machine
-    address->sin_family = AF_INET;
-    address->sin_addr.s_addr = INADDR_ANY;
-    address->sin_port = htons(port);
+	// Create socket
+	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (sockfd < 0) {
+		perror("socket");
+		exit(EXIT_FAILURE);
+	}
 
-    // Reuse port if possible
-    int re = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
-        perror("Could not reopen socket");
-        exit(EXIT_FAILURE);
-    }
-
-    // Bind address to socket
-    if (bind(sockfd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
+	// Reuse port if possible
+	re = 1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
+		perror("setsockopt");
+		exit(EXIT_FAILURE);
+	}
+	// Bind address to the socket
+	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
+		perror("bind");
+		exit(EXIT_FAILURE);
+	}
+    
+	freeaddrinfo(res);
 
     return sockfd;
 }

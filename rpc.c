@@ -7,8 +7,14 @@
 #include <unistd.h> 
 #include "rpc.h"
 
+typedef struct rpc_function {
+    char *name;
+    rpc_handler handler;
+} rpc_function;
+
 struct rpc_server {
     int sockfd;
+    rpc_function *functions[10];
 };
 
 int setup_server_socket(int port);
@@ -22,7 +28,7 @@ rpc_server *rpc_init_server(int port) {
         return NULL;
     };
 
-    printf("Server initiated\n");
+    // printf("Server initiated\n");
 
     rpc_server *server = malloc(sizeof(rpc_server));
     server->sockfd = sockfd;
@@ -31,7 +37,15 @@ rpc_server *rpc_init_server(int port) {
 }
 
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
-    return -1;
+    rpc_function *function = malloc(sizeof(function));
+    function->name = name;
+    function->handler = handler;
+
+    srv->functions[0] = function;
+
+    // printf("Registered function %s\n", name);
+
+    return 0;
 }
 
 void rpc_serve_all(rpc_server *srv) {
@@ -76,7 +90,7 @@ rpc_client *rpc_init_client(char *addr, int port) {
     if ((sockfd = setup_client_socket(addr, port))==-1){
         return NULL;
     };
-    printf("Client initiated\n");
+    // printf("Client initiated\n");
 
     rpc_client *client = malloc(sizeof(rpc_client));
     client->sockfd = sockfd;
@@ -168,7 +182,7 @@ int setup_client_socket(char* hostname, const int port) {
 	// Get addrinfo of server
     char service[snprintf(NULL, 0, "%d", port) + 1];
     sprintf(service, "%d", port);
-    printf("hostname: %s\n", hostname);
+    // printf("hostname: %s\n", hostname);
 	s = getaddrinfo(hostname, service, &hints, &servinfo);
 	if (s != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));

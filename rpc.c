@@ -8,7 +8,6 @@
 #include "rpc.h"
 
 struct rpc_server {
-    struct sockaddr_in6* address;
     int sockfd;
 };
 
@@ -17,38 +16,18 @@ int setup_client_socket(char* hostname, const int port);
 
 rpc_server *rpc_init_server(int port) {
     // Initialize socket
-    int sockfd, newsockfd;
+    int sockfd;
 
-    sockfd = setup_server_socket(port);
-
-    // Listen on socket for connections
-    if (listen(sockfd, 5) < 0) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-
-    while (1){
-        // Accept connection
-        newsockfd = accept(sockfd, NULL, NULL);
-        if (newsockfd < 0) {
-            perror("accept");
-            exit(EXIT_FAILURE);
-        }
-
-        // Read from client
-        // TODO: perform different actions depending on input from client
-
-        close(newsockfd);
-    }
+    if ((sockfd = setup_server_socket(port))==-1){
+        return NULL;
+    };
 
     printf("Server initiated\n");
 
-    // rpc_server server = {
-    //     .address = &address,
-    //     .sockfd = sockfd
-    // };
+    rpc_server *server = malloc(sizeof(rpc_server));
+    server->sockfd = sockfd;
 
-    return NULL;
+    return server;
 }
 
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
@@ -56,6 +35,30 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 }
 
 void rpc_serve_all(rpc_server *srv) {
+    int sockfd, newsockfd;
+    sockfd = srv->sockfd;
+
+    // Listen on socket for connections
+    if (listen(sockfd, 5) < 0) {
+        perror("ERROR: listen");
+        exit(EXIT_FAILURE);
+    }
+
+    while (1){
+        // Accept connection
+        newsockfd = accept(sockfd, NULL, NULL);
+        if (newsockfd < 0) {
+            perror("ERROR: accept");
+        }
+
+        // TODO
+        // Get input from client & call appropriate functions
+        // REG -> register the procedure
+        // FIND -> find procedure
+        // CALL -> call procedure
+
+        close(newsockfd);
+    }
 
 }
 
@@ -64,30 +67,35 @@ struct rpc_client {
 };
 
 struct rpc_handle {
-    /* Add variable(s) for handle */
+    
 };
 
 rpc_client *rpc_init_client(char *addr, int port) {
     int sockfd;
 
-    sockfd = setup_client_socket(addr, port);
+    if ((sockfd = setup_client_socket(addr, port))==-1){
+        return NULL;
+    };
     printf("Client initiated\n");
 
-	close(sockfd);
+    rpc_client *client = malloc(sizeof(rpc_client));
+    client->sockfd = sockfd;
 
-    return NULL;
+    return client;
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
+
     return NULL;
 }
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
+
     return NULL;
 }
 
 void rpc_close_client(rpc_client *cl) {
-
+    close(cl->sockfd);
 }
 
 void rpc_data_free(rpc_data *data) {
@@ -120,26 +128,26 @@ int setup_server_socket(const int port) {
 
 	if (s != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	// Create socket
 	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (sockfd < 0) {
-		perror("socket");
-		exit(EXIT_FAILURE);
+		perror("ERROR: socket");
+		return -1;
 	}
 
 	// Reuse port if possible
 	re = 1;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
-		perror("setsockopt");
-		exit(EXIT_FAILURE);
+		perror("ERROR: setsockopt");
+		return -1;
 	}
 	// Bind address to the socket
 	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
-		perror("bind");
-		exit(EXIT_FAILURE);
+		perror("ERROR: bind");
+		return -1;
 	}
     
 	freeaddrinfo(res);
@@ -164,7 +172,7 @@ int setup_client_socket(char* hostname, const int port) {
 	s = getaddrinfo(hostname, service, &hints, &servinfo);
 	if (s != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	// Connect to first valid result
@@ -182,7 +190,7 @@ int setup_client_socket(char* hostname, const int port) {
 	}
 	if (rp == NULL) {
 		fprintf(stderr, "client: failed to connect\n");
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	freeaddrinfo(servinfo);

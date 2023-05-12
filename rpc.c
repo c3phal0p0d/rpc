@@ -7,14 +7,16 @@
 #include <unistd.h> 
 #include "rpc.h"
 
-typedef struct rpc_function {
+typedef struct registered_function {
+    int id;
     char *name;
     rpc_handler handler;
-} rpc_function;
+} registered_function;
 
 struct rpc_server {
     int sockfd;
-    rpc_function *functions[10];
+    int num_functions;
+    registered_function **functions;
 };
 
 int setup_server_socket(int port);
@@ -32,24 +34,30 @@ rpc_server *rpc_init_server(int port) {
 
     rpc_server *server = malloc(sizeof(rpc_server));
     server->sockfd = sockfd;
+    server->num_functions = 0;
+    server->functions = malloc(sizeof(registered_function));
 
     return server;
 }
 
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
-    rpc_function *function = malloc(sizeof(function));
+    registered_function *function = malloc(sizeof(registered_function));
+    function->id = srv->num_functions;
     function->name = name;
     function->handler = handler;
 
-    srv->functions[0] = function;
+    srv->functions[srv->num_functions] = function;
+    srv->num_functions++;
 
-    // printf("Registered function %s\n", name);
+    printf("Registered function name: %s, id:%d\n", name, function->id);
 
-    return 0;
+    return function->id;
 }
 
 void rpc_serve_all(rpc_server *srv) {
-    int sockfd, newsockfd;
+    printf("Serving all....\n");
+    int sockfd, newsockfd, n;
+    char buffer[256];
     sockfd = srv->sockfd;
 
     // Listen on socket for connections
@@ -58,18 +66,72 @@ void rpc_serve_all(rpc_server *srv) {
         exit(EXIT_FAILURE);
     }
 
+    // Accept connection
+    struct sockaddr_storage client_addr;
+	socklen_t client_addr_size;
+    client_addr_size = sizeof client_addr;
+	newsockfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_addr_size);
+	if (newsockfd < 0) {
+		perror("accept");
+		exit(EXIT_FAILURE);
+	}
+    printf("Accepted connection\n");
+
     while (1){
-        // Accept connection
-        newsockfd = accept(sockfd, NULL, NULL);
-        if (newsockfd < 0) {
-            perror("ERROR: accept");
+        n = read(newsockfd, buffer, 255);
+
+		if (n < 0) {
+			perror("ERROR reading from socket");
+			return;
+		}
+        buffer[n] = '\0';
+        printf("read in message %s from client\n", buffer);
+
+        // Disconnect
+		if (n == 0) {
+			break;
+		}
+
+        // Get input from client & send a response
+        char request[5];
+        char request_data[1000];
+        char response[3];
+
+        strncpy(request, buffer, 4);
+        request[4] = '\0';
+        printf("request: %s\n", request);
+
+        strncpy(request_data, buffer + 5, n-4);
+        request_data[n-4] = '\0';
+        printf("request data: %s\n", request_data);
+
+        // FIND -> find function on server
+        if (strncmp("FIND", request, 4)==0){
+            printf("FIND request received\n");
+            printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
+            strcpy(response, "-1");
+            for (int i=0; i<10; i++){
+                if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, request_data)==0){
+                    // Get function id
+                    printf("found, function id: %d\n", srv->functions[i]->id);
+                    sprintf(response, "%d", srv->functions[i]->id);
+                    break;
+                }
+            }
+        }
+        // CALL -> call function and return its result
+        else if (strncmp("CALL", request, 4)==0){
+            printf("CALL request\n");
+            // response = "";
         }
 
-        // TODO
-        // Get input from client & call appropriate functions
-        // REG -> register the procedure
-        // FIND -> find procedure
-        // CALL -> call procedure
+        // Send response to client
+        n = write(newsockfd, response, strlen(response));
+		if (n < 0) {
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+        printf("Sent response %s\n", response);
 
         close(newsockfd);
     }
@@ -81,7 +143,7 @@ struct rpc_client {
 };
 
 struct rpc_handle {
-    
+    int function_id;
 };
 
 rpc_client *rpc_init_client(char *addr, int port) {
@@ -99,8 +161,38 @@ rpc_client *rpc_init_client(char *addr, int port) {
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
+    char buffer[256];
+    int n, function_id;
+    char request[256];
 
-    return NULL;
+    // Send FIND request to server
+    strcpy(request, "FIND-");
+    strcat(request, name);
+    printf("sending request: %s\n", request);
+    n = write(cl->sockfd, request, strlen(request));
+	if (n < 0) {
+		perror("socket");
+		return NULL;
+	}
+    printf("FIND request sent\n");
+
+    // Get id of function
+    n = read(cl->sockfd, buffer, 255);
+    function_id = atoi(buffer);
+    printf("Received function id: %d\n", function_id);
+
+    if (function_id==-1){
+        // Function not found on server
+        printf("function not found\n");
+        return NULL;
+    }
+
+    printf("function found\n");
+    
+    rpc_handle *handle = malloc(sizeof(rpc_handle));
+    handle->function_id = function_id;
+
+    return handle;
 }
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
@@ -122,7 +214,6 @@ void rpc_data_free(rpc_data *data) {
     free(data);
 }
 
-
 /* Adapted from workshop 9 code */
 /* Create and return a server socket bound to the given port */
 int setup_server_socket(const int port) {
@@ -133,7 +224,7 @@ int setup_server_socket(const int port) {
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;     // for bind, listen, accept
+	hints.ai_flags = AI_PASSIVE;
 
     // Get addrinfo
     char service[snprintf(NULL, 0, "%d", port) + 1];

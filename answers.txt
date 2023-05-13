@@ -35,16 +35,15 @@ typedef struct {
 } rpc_data;
 
 Protocol:
-- request_id: 6-bit integer corresponding to request. Used to group messages that are part of the same request
+- request_id: Integer corresponding to request. Used to group messages that are part of the same request
 - FIND: Find function on server, returning its id if found
     - Client request: request_id FIND name
     - Server response: 
         - If found: request_id OK function_id
-        - If not found: request_id OK -1
-        - If error occurs: request_id ER
+        - If not found: request_id ER -1
 - CALL: Call function on server, returning its result
     - Client request: 
-        - 1st message: request_id CALL 1 function_id (using the function id stored in rpc_handle)
+        - 1st message: request_id CALL function_id (using the function id stored in rpc_handle)
         - 2nd message: request_id CALL 2 data1 data2_len (using values from input rpc_data struct)
         - 3rd message: request_id CALL 3 data2 (using value from input rpc_data struct)
     - Server response: 

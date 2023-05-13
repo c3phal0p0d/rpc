@@ -3,16 +3,16 @@ RPC_SYSTEM=rpc.o
 
 .PHONY: format all
 
-all: $(RPC_SYSTEM) client.o server.o
+all: $(RPC_SYSTEM) rpc-client rpc-server
 
 $(RPC_SYSTEM): rpc.c rpc.h
 	$(CC) -c -Wall -o $@ $<
 
-client.o: client.c rpc.o
-	cc -o client.o client.c rpc.o
+rpc-client: client.c rpc.o
+	cc -Wall -o rpc-client client.c rpc.o
 
-server.o: server.c rpc.o
-	cc -o server.o server.c rpc.o
+rpc-server: server.c rpc.o
+	cc -Wall -o rpc-server server.c rpc.o
 
 # utils.o: utils.c utils.h
 # 	$(CC) -c -Wall -o $@ $<
@@ -25,4 +25,4 @@ format:
 	clang-format -style=file -i *.c *.h
 
 clean:
-	rm -f *.o
+	rm -f *.o rpc-client rpc-server

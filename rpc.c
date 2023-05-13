@@ -93,28 +93,31 @@ void rpc_serve_all(rpc_server *srv) {
 		}
 
         // Get input from client & send a response
-        char request[5];
-        char request_data[1000];
-        char response[3];
+        char response[256];
 
-        strncpy(request, buffer, 4);
-        request[4] = '\0';
+        int request_id = atoi(strtok(buffer, " "));
+        printf("request id: %d\n", request_id);
+
+        char *request = strtok(NULL, " ");
+        // strncpy(request, buffer+2, 4);
+        // request[4] = '\0';
         printf("request: %s\n", request);
 
-        strncpy(request_data, buffer + 5, n-4);
-        request_data[n-4] = '\0';
+        char *request_data = strtok(NULL, " ");
+        // strncpy(request_data, buffer + 7, n-6);
+        // request_data[n-6] = '\0';
         printf("request data: %s\n", request_data);
 
         // FIND -> find function on server
         if (strncmp("FIND", request, 4)==0){
             printf("FIND request received\n");
             printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
-            strcpy(response, "-1");
             for (int i=0; i<10; i++){
                 if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, request_data)==0){
                     // Get function id
                     printf("found, function id: %d\n", srv->functions[i]->id);
-                    sprintf(response, "%d", srv->functions[i]->id);
+                    printf("request: %d, function id: %d\n", request_id, srv->functions[i]->id);
+                    sprintf(response, "%d OK %d", request_id, srv->functions[i]->id);
                     break;
                 }
             }
@@ -122,27 +125,44 @@ void rpc_serve_all(rpc_server *srv) {
         // CALL -> call function and return its result
         else if (strncmp("CALL", request, 4)==0){
             printf("CALL request\n");
-            // response = "";
+
+            // Convert request data to rpc_data struct
+            int function_id = atoi(request_data);
+            int data1;
+            size_t data2_len;
+            void *data2;
+            rpc_data *input = malloc(sizeof(rpc_data));
+            input->data1 = data1;
+            input->data2_len = data2_len;
+            input->data2 = data2;
+
+            // Call function
+            rpc_handler handler = srv->functions[function_id]->handler;
+            rpc_data *result = handler(input);
+
+            // Convert result to request data string
+
         }
 
         // Send response to client
+        printf("Sent response %s\n", response);
         n = write(newsockfd, response, strlen(response));
 		if (n < 0) {
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
-        printf("Sent response %s\n", response);
 
         close(newsockfd);
     }
-
 }
 
 struct rpc_client {
     int sockfd;
+    int request_count;
 };
 
 struct rpc_handle {
+    char *name;
     int function_id;
 };
 
@@ -156,19 +176,23 @@ rpc_client *rpc_init_client(char *addr, int port) {
 
     rpc_client *client = malloc(sizeof(rpc_client));
     client->sockfd = sockfd;
+    client->request_count = 0;
 
     return client;
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
-    char buffer[256];
-    int n, function_id;
+    int n, request_id;
     char request[256];
+    char buffer[256];
 
-    // Send FIND request to server
-    strcpy(request, "FIND-");
-    strcat(request, name);
+    // Send FIND request to server: single message of form "request_id FIND name"
+    request_id = cl->request_count;
+    cl->request_count++;
+    sprintf(request, "%d FIND %s", request_id, name);
+
     printf("sending request: %s\n", request);
+
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
 		perror("socket");
@@ -176,26 +200,88 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 	}
     printf("FIND request sent\n");
 
-    // Get id of function
+    // Get response from server of form "request_id OK function_id"
+    printf("reading response from server\n");
     n = read(cl->sockfd, buffer, 255);
-    function_id = atoi(buffer);
-    printf("Received function id: %d\n", function_id);
+    printf("response from server: %s\n", buffer);
 
-    if (function_id==-1){
-        // Function not found on server
+    // Check that ID of response corresponds to ID of request
+    int response_id = atoi(strtok(buffer, " "));
+    printf("request id: %d\n", response_id);
+
+    if (response_id!=request_id) {
+        return NULL;
+    }
+
+    char ok_message[3];
+    strncpy(ok_message, buffer + 2, 2);
+    ok_message[2] = '\0';
+    printf("ok message: %s\n", ok_message);
+
+    // Check if function was found
+    if (strcmp(ok_message, "OK")==0){
+        // Get function id from response
+        char function_id_str[3];
+        strncpy(function_id_str, buffer + 5, n-5);
+        function_id_str[n-5] = '\0';
+        int function_id = atoi(function_id_str);
+        printf("Function found with id: %d\n", function_id);
+        
+        // Return handle corresponding to function
+        rpc_handle *handle = malloc(sizeof(rpc_handle));
+        handle->name = name;
+        handle->function_id = function_id;
+
+        return handle;
+    }
+    else {
         printf("function not found\n");
         return NULL;
     }
 
-    printf("function found\n");
-    
-    rpc_handle *handle = malloc(sizeof(rpc_handle));
-    handle->function_id = function_id;
-
-    return handle;
+    return NULL;
 }
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
+    char buffer[256];
+    char request[256];
+    char function_id[3];
+    int n, request_id;
+    // Input rpc_data parameters
+    int data1;
+    size_t data2_len;
+    void *data2;
+
+    // Send CALL request to server: three messages containing data needed to call the function
+    // 1st message: request_id CALL 1 function_id (using the function id stored in rpc_handle)
+    // 2nd message: request_id CALL 2 data1 data2_len (using values from input rpc_data struct)
+    // 3rd message: request_id CALL 3 data2 (using value from input rpc_data struct)
+    
+    sprintf(request, "%d CALL 1 %d", request_id, h->function_id);
+
+    sprintf(request, "%d CALL 2 %d %d", request_id, payload->data1, payload->data2_len);
+
+    sprintf(request, "%d CALL 3 %d", request_id, payload->data2);
+
+    printf("sending request: %s\n", request);
+    n = write(cl->sockfd, request, strlen(request));
+	if (n < 0) {
+		perror("socket");
+		return NULL;
+	}
+    printf("CALL request sent\n");
+
+    // Get function result
+    n = read(cl->sockfd, buffer, 255);
+    printf("Received function result: %s\n", buffer);
+
+    if (buffer==NULL){
+        printf("error getting result of function\n");
+        return NULL;
+    }
+
+    rpc_data *data = malloc(sizeof(rpc_data));
+    strcpy(data->data1, buffer);
 
     return NULL;
 }

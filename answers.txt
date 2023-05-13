@@ -3,19 +3,52 @@ Login ID: nchiorsac
 Student ID: 1145264
 
 1. Should the server accept calls from everyone, or just a subset of users?
+Depends on the server.
 
-
-2. Should authentication etc. be provided by the RPC framework, or by the functions that use the RPC frame-work?
-
+2. Should authentication etc. be provided by the RPC framework, or by the functions that use the RPC framework?
+Should be provided by the functions that use the RPC framework, since authentication may only be necessary for specific kinds of functions (e.g. accessing files with restricted permissions)
 
 3. What transport layer protocol should be used? What are the trade-offs?
-
+Out of the two transport layer protocols TCP and UDP, TCP should be used for the RPC system, since transmitting packets without any loss is important.
 
 4. In which function(s) should the socket(s) be created?
-
+The sockets should be created in rpc_init_server and rpc_init_client as part of the initialization process, and then later used on the server side by rpc_serve_all and on the client side by rpc_find and rpc_call.
 
 5. Should rpc_client and rpc_server be allocated dynamically or statically? What are the implications for the client and server code?
-
+They should be allocated dynamically.
 
 6. What happens if one host uses big-endian byte order and the other uses little-endian? How does that relate to “network byte order”?
+Network byte order is big-endian. If a host uses little-endian byte order, it must first be converted to big-endian before being transmitted over the network
 
+Protocol design:
+- Encode size of data block in packet with Elias encoding
+- Register procedure
+- Request procedure
+- Return error when request for procedure that does not exist
+- Return result of procedure
+- IP packets have a max allowed size
+
+typedef struct {
+    int data1;
+    size_t data2_len;
+    void *data2;
+} rpc_data;
+
+Protocol:
+- request_id: 6-bit integer corresponding to request. Used to group messages that are part of the same request
+- FIND: Find function on server, returning its id if found
+    - Client request: request_id FIND name
+    - Server response: 
+        - If found: request_id OK function_id
+        - If not found: request_id OK -1
+        - If error occurs: request_id ER
+- CALL: Call function on server, returning its result
+    - Client request: 
+        - 1st message: request_id CALL 1 function_id (using the function id stored in rpc_handle)
+        - 2nd message: request_id CALL 2 data1 data2_len (using values from input rpc_data struct)
+        - 3rd message: request_id CALL 3 data2 (using value from input rpc_data struct)
+    - Server response: 
+        - If function is called without errors:
+            - 1st message: request_id OK 1 data1 data2_len (using values from output rpc_data struct)
+            - 2nd message: request_id OK 2 data2 (using value from output rpc_data struct)
+        - If error occurs: request_id ER 

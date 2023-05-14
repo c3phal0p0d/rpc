@@ -146,6 +146,9 @@ void rpc_serve_all(rpc_server *srv) {
 
             // Convert result to request data string
             sprintf(response, "%d OK %d %d %ld %p", request_id, function_id, result->data1, result->data2_len, result->data2);
+            rpc_data_free(result);
+            input->data2 = NULL;
+            rpc_data_free(input);
             //printf("response: %s\n", response);
         }
 
@@ -317,9 +320,11 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 
 void rpc_close_client(rpc_client *cl) {
     close(cl->sockfd);
+    free(cl);
 }
 
 void rpc_data_free(rpc_data *data) {
+    // printf("freeing\n");
     if (data == NULL) {
         return;
     }

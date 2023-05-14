@@ -40,14 +40,9 @@ Protocol:
     - Client request: request_id FIND name
     - Server response: 
         - If found: request_id OK function_id
-        - If not found: request_id ER -1
+        - If not found: request_id ER
 - CALL: Call function on server, returning its result
-    - Client request: 
-        - 1st message: request_id CALL function_id (using the function id stored in rpc_handle)
-        - 2nd message: request_id CALL 2 data1 data2_len (using values from input rpc_data struct)
-        - 3rd message: request_id CALL 3 data2 (using value from input rpc_data struct)
+    - Client request: request_id CALL function_id data1 data2_len data2 (using value from input rpc_data struct)
     - Server response: 
-        - If function is called without errors:
-            - 1st message: request_id OK 1 data1 data2_len (using values from output rpc_data struct)
-            - 2nd message: request_id OK 2 data2 (using value from output rpc_data struct)
+        - If function is called without errors: request_id OK data1 data2_len data2 (using value from output rpc_data struct)
         - If error occurs: request_id ER 

@@ -1,3 +1,4 @@
+.DS_STORE
 *.o
 *.a
 rpc-client
@@ -5,4 +6,3 @@ rpc-server
 test-client
 test-server
 cases/
-artifacts/

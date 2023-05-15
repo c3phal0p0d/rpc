@@ -105,16 +105,22 @@ void rpc_serve_all(rpc_server *srv) {
             char *request_data = strtok(NULL, " ");
             //printf("request data: %s\n", request_data);
 
-            //printf("FIND request received\n");
+            // printf("FIND request received\n");
             //printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
-            for (int i=0; i<10; i++){
+            int function_found = 0;
+            for (int i=0; i<srv->num_functions; i++){
                 if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, request_data)==0){
                     // Get function id
                     //printf("found, function id: %d\n", srv->functions[i]->id);
                     //printf("request: %d, function id: %d\n", request_id, srv->functions[i]->id);
                     sprintf(response, "%d OK %d", request_id, srv->functions[i]->id);
+                    function_found = 1;
                     break;
                 }
+            }
+            if (!function_found){
+                //printf("function not found\n");
+                sprintf(response, "%d ER", request_id);
             }
         }
         // CALL -> call function and return its result
@@ -200,6 +206,7 @@ rpc_client *rpc_init_client(char *addr, int port) {
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
+    //printf("rpc_find called\n");
     int n, request_id;
     char request[256];
     char buffer[256];
@@ -282,7 +289,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     
     sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
 
-    printf("sending request: %s\n", request);
+    //printf("sending request: %s\n", request);
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
 		perror("socket");
@@ -378,8 +385,10 @@ int setup_server_socket(const int port) {
 	hints.ai_flags = AI_PASSIVE;
 
     // Get addrinfo
+    //printf("port: %d\n", port);
     char service[snprintf(NULL, 0, "%d", port) + 1];
     sprintf(service, "%d", port);
+    //printf("service: %s\n", service);
 	s = getaddrinfo(NULL, service, &hints, &res);
 
 	if (s != 0) {
@@ -422,8 +431,10 @@ int setup_client_socket(char* hostname, const int port) {
 	hints.ai_socktype = SOCK_STREAM;
 
 	// Get addrinfo of server
+    //printf("port: %d\n", port);
     char service[snprintf(NULL, 0, "%d", port) + 1];
     sprintf(service, "%d", port);
+    //printf("service: %s\n", service);
     // printf("hostname: %s\n", hostname);
 	s = getaddrinfo(hostname, service, &hints, &servinfo);
 	if (s != 0) {

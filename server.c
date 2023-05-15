@@ -1,5 +1,3 @@
-// cc -o client.o client.c rpc.o
-
 #include "rpc.h"
 #include <assert.h>
 #include <stdio.h>
@@ -16,10 +14,10 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if (rpc_register(state, "add2", add2_i8) == -1) {
-        fprintf(stderr, "Failed to register add2\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (rpc_register(state, "add2", add2_i8) == -1) {
+    //     fprintf(stderr, "Failed to register add2\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     rpc_serve_all(state);
 

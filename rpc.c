@@ -128,8 +128,17 @@ void rpc_serve_all(rpc_server *srv) {
             //printf("data1: %d\n", data1);
             size_t data2_len = atoi(strtok(NULL, " "));
             //printf("data2_len: %d\n", data2_len);
-            int data2_value = atoi(strtok(NULL, " "));
-            void *data2 = &data2_value;
+
+            // Parse data2 byte array string into appropriate format to be used by function
+            char *data2_array_str = strtok(NULL, " ");
+            uint8_t data2_array[data2_len];
+            data2_array[0] = atoi(strtok(data2_array_str, ","));
+            for (int i=1; i<data2_len; i++){
+                data2_array[i] = atoi(strtok(NULL, " "));
+            }
+
+            void *data2 = &data2_array;
+
             //printf("data2: %d\n", data2);
             rpc_data *input = malloc(sizeof(rpc_data));
             input->data1 = data1;
@@ -172,7 +181,6 @@ struct rpc_client {
 };
 
 struct rpc_handle {
-    char *name;
     int function_id;
 };
 
@@ -238,7 +246,6 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
         
         // Return handle corresponding to function
         rpc_handle *handle = malloc(sizeof(rpc_handle));
-        handle->name = name;
         handle->function_id = function_id;
 
         return handle;
@@ -252,16 +259,28 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 }
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
-    char buffer[256];
-    char request[256];
+    char buffer[2000];
+    char request[2000];
     int n, request_id;
-
+ 
     // Send CALL request to server: request_id CALL function_id data1 data2_len data2 (using value from input rpc_data struct)
     request_id = cl->request_count;
-    
-    sprintf(request, "%d CALL %d %d %ld %d", request_id, h->function_id, payload->data1, payload->data2_len, *(int*)payload->data2);
 
-    //printf("sending request: %s\n", request);
+    // Convert data2 byte array to string format
+    // printf("converting data2 to array string\n");
+    //uint8_t data2_array[payload->data2_len];
+    char data2_array_str[1000];
+    char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
+    //strcpy(data2_array, *(uint8_t *)payload->data2);
+    for (int i=0; i<payload->data2_len; i++){
+        sprintf(data2_elem, "%d,", *(uint8_t *)payload->data2+i);
+        strcat(data2_array_str, data2_elem);
+    }
+    // printf("data2 array string: %s\n", data2_array_str);
+    
+    sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
+
+    // printf("sending request: %s\n", request);
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
 		perror("socket");
@@ -295,13 +314,20 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
         //printf("data1: %d\n", data1);
         int data2_len = atoi(strtok(NULL, " "));
         //printf("data2_len: %d\n", data2_len);
-        char *data2_value = strtok(NULL, " ");
-        //printf("data2_value: %d\n", data2_value);
+
+        // Parse data2 byte array string into appropriate format to be used by function
+        char *data2_array_str = strtok(NULL, " ");
+        uint8_t data2_array[data2_len];
+        data2_array[0] = atoi(strtok(data2_array_str, ","));
+        for (int i=1; i<data2_len; i++){
+            data2_array[i] = atoi(strtok(NULL, " "));
+        }
+
         void *data2;
         if (data2_len==0){
             data2 = NULL;
         } else {
-            data2 = &data2_value;
+            data2 = &data2_array;
         }
         
         // Return rpc_data struct containing result of function

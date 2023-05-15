@@ -18,11 +18,11 @@ rpc-server: server.c rpc.o
 $(RPC_SYSTEM_A): rpc.o
 	ar rcs $(RPC_SYSTEM_A) $(RPC_SYSTEM)
 
-test-client: 
-	$(CC) -o test-client artifacts/client.a rpc.a
+# test-client: 
+# 	$(CC) -o test-client artifacts/client.a rpc.a
 
-test-server:
-	$(CC) -o test-server artifacts/server.a rpc.a
+# test-server:
+# 	$(CC) -o test-server artifacts/server.a rpc.a
 
 format:
 	clang-format -style=file -i *.c *.h

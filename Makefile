@@ -4,7 +4,7 @@ RPC_SYSTEM_A=rpc.a
 
 .PHONY: format all
 
-all: $(RPC_SYSTEM) $(RPC_SYSTEM_A) rpc-client rpc-server test-client test-server
+all: $(RPC_SYSTEM) $(RPC_SYSTEM_A) rpc-client rpc-server
 
 $(RPC_SYSTEM): rpc.c rpc.h
 	$(CC) -c -Wall -g -o $@ $<

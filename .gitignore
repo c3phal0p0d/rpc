@@ -1,6 +1,6 @@
 .DS_STORE
 *.o
-rpc.a
+*.a
 rpc-client
 rpc-server
 test-client

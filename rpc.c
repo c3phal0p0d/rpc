@@ -221,6 +221,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     // Get response from server of form "request_id OK function_id"
     //printf("reading response from server\n");
     n = read(cl->sockfd, buffer, 255);
+    buffer[n] = '\0';
     //printf("response from server: %s\n", buffer);
 
     // Check that ID of response corresponds to ID of request
@@ -270,6 +271,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // printf("converting data2 to array string\n");
     //uint8_t data2_array[payload->data2_len];
     char data2_array_str[1000];
+    strcpy(data2_array_str, "");
     char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
     //strcpy(data2_array, *(uint8_t *)payload->data2);
     for (int i=0; i<payload->data2_len; i++){
@@ -280,7 +282,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     
     sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
 
-    // printf("sending request: %s\n", request);
+    printf("sending request: %s\n", request);
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
 		perror("socket");
@@ -290,12 +292,14 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 
     // Get function result
     n = read(cl->sockfd, buffer, 255);
+    buffer[n] = '\0';
 
     // Check that ID of response corresponds to ID of request
     int response_id = atoi(strtok(buffer, " "));
     //printf("response id: %d, request id: %d\n", response_id, request_id);
     while (response_id!=request_id && n>0){
         n = read(cl->sockfd, buffer, 255);
+        buffer[n] = '\0';
         response_id = atoi(strtok(buffer, " "));
         //printf("Received function result: %s\n", buffer);
     }
@@ -316,7 +320,8 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
         //printf("data2_len: %d\n", data2_len);
 
         // Parse data2 byte array string into appropriate format to be used by function
-        char *data2_array_str = strtok(NULL, " ");
+        char data2_array_str[data2_len*2];
+        strcpy(data2_array_str, strtok(NULL, " "));
         uint8_t data2_array[data2_len];
         data2_array[0] = atoi(strtok(data2_array_str, ","));
         for (int i=1; i<data2_len; i++){

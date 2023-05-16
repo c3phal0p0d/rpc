@@ -84,9 +84,9 @@ void rpc_serve_all(rpc_server *srv) {
     while (1){
         n = read(newsockfd, buffer, 255);
 
-        if (n==0){
-            break;
-        }
+        // if (n==0){
+        //     break;
+        // }
 
 		if (n < 0) {
 			perror("ERROR reading from socket");
@@ -416,6 +416,12 @@ int setup_server_socket(const int port) {
 		return -1;
 	}
 	// Bind address to the socket
+
+    int enable = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
 	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
 		perror("ERROR: bind");
 		return -1;

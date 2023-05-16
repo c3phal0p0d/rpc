@@ -46,14 +46,14 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     strcpy(function->name, name); 
     function->handler = handler;
 
-    //// printf("num_functions: %d\n", srv->num_functions);
+    // printf("num_functions: %d\n", srv->num_functions);
 
     srv->functions[srv->num_functions] = function;
     srv->num_functions++;
 
-   // printf("Registered function name: %s, id:%d\n", function->name, function->id);
-    //// printf("num_functions: %d\n", srv->num_functions);
-    //// printf("srv->functions[srv->num_functions]->name: %s\n", srv->functions[function->id]->name);
+    // printf("Registered function name: %s, id:%d\n", function->name, function->id);
+    // printf("num_functions: %d\n", srv->num_functions);
+    // printf("srv->functions[srv->num_functions]->name: %s\n", srv->functions[function->id]->name);
 
     return function->id;
 }
@@ -93,31 +93,31 @@ void rpc_serve_all(rpc_server *srv) {
 			return;
 		}
         buffer[n] = '\0';
-       // printf("read in message %s from client\n", buffer);
+        //printf("read in message %s from client\n", buffer);
 
         // Get input from client & send a response
         char response[256];
 
         int request_id = atoi(strtok(buffer, " "));
-       // printf("request id: %d\n", request_id);
+        //printf("request id: %d\n", request_id);
 
         char *request = strtok(NULL, " ");
-       // printf("request: %s\n", request);
+        //printf("request: %s\n", request);
 
         // FIND -> find function on server
         if (strncmp("FIND", request, 4)==0){
             char *request_data = strtok(NULL, " ");
-           // printf("request data: %s\n", request_data);
+            //printf("request data: %s\n", request_data);
 
-           // printf("FIND request received\n");
-            //// printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
+            //printf("FIND request received\n");
+            //printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
             int function_found = 0;
-            //// printf("num_function: %d\n", srv->num_functions);
+            //printf("num_function: %d\n", srv->num_functions);
             for (int i=0; i<srv->num_functions; i++){
                 //// printf("function name: %s\n", srv->functions[0]->name);
                 if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, request_data)==0){
                     // Get function id
-                   // printf("found, function id: %d\n", srv->functions[i]->id);
+                    //printf("found, function id: %d\n", srv->functions[i]->id);
                     //// printf("request: %d, function id: %d\n", request_id, srv->functions[i]->id);
                     sprintf(response, "%d OK %d", request_id, srv->functions[i]->id);
                     function_found = 1;
@@ -125,31 +125,31 @@ void rpc_serve_all(rpc_server *srv) {
                 }
             }
             if (!function_found){
-               // printf("function not found\n");
+                //printf("function not found\n");
                 sprintf(response, "%d ER", request_id);
             }
         }
         // CALL -> call function and return its result
         else if (strncmp("CALL", request, 4)==0){
-           // printf("CALL request\n");
+            //printf("CALL request\n");
 
             // Convert request data to rpc_data struct
             int function_id = atoi(strtok(NULL, " "));
-           // printf("function id: %d\n", function_id);
+            //printf("function id: %d\n", function_id);
             int data1 = atoi(strtok(NULL, " "));
-           // printf("data1: %d\n", data1);
+            //printf("data1: %d\n", data1);
             size_t data2_len = atoi(strtok(NULL, " "));
-           // printf("data2_len: %ld\n", data2_len);
+            //printf("data2_len: %ld\n", data2_len);
 
             // Parse data2 byte array string into appropriate format to be used by function
             //char *data2_array_str = strtok(NULL, " ");
-            char data2_array_str[data2_len*2];
+            char data2_array_str[data2_len*2 + 1];
             strcpy(data2_array_str, strtok(NULL, " "));
-           // printf("data2 array str: %s\n", data2_array_str);
+            //printf("data2 array str: %s\n", data2_array_str);
             //uint8_t data2_array[data2_len];
             uint8_t *data2_array = malloc(sizeof(uint8_t) * (data2_len + 1));
             data2_array[0] = atoi(strtok(data2_array_str, ","));
-           // printf("data2_array[0]: %c\n", data2_array[0]);
+            //printf("data2_array[0]: %c\n", data2_array[0]);
             for (int i=1; i<data2_len; i++){
                 data2_array[i] = atoi(strtok(NULL, ","));
             }
@@ -166,13 +166,9 @@ void rpc_serve_all(rpc_server *srv) {
             rpc_handler handler = srv->functions[function_id]->handler;
             rpc_data *result = handler(input);
 
-            //// printf("result data1: %d\n", result->data1);
-            //// printf("result data2_len: %d\n", result->data2_len);
-            //// printf("result data2: %d\n", result->data2);
-
-            // Convert result to request data string
-            // sprintf(response, "%d OK %d %d %ld %p", request_id, function_id, result->data1, result->data2_len, result->data2);
-            //// printf("response: %s\n", response);
+            // printf("result data1: %d\n", result->data1);
+            // printf("result data2_len: %d\n", result->data2_len);
+            // printf("result data2: %d\n", result->data2);
 
             // Convert data2 byte array to string format
             char result_data2_array_str[result->data2_len*2];
@@ -183,7 +179,7 @@ void rpc_serve_all(rpc_server *srv) {
                 sprintf(data2_elem, "%d,", *(uint8_t *)result->data2+i);
                 strcat(result_data2_array_str, data2_elem);
             }
-           // printf("data2 array string: %s\n", result_data2_array_str);
+            //printf("data2 array string: %s\n", result_data2_array_str);
             
             sprintf(response, "%d OK %d %d %ld %s", request_id, function_id, result->data1, result->data2_len, result_data2_array_str);
 
@@ -193,7 +189,7 @@ void rpc_serve_all(rpc_server *srv) {
         }
 
         // Send response to client
-       // printf("Sent response %s\n", response);
+        //printf("Sent response %s\n", response);
         n = write(newsockfd, response, strlen(response));
 		if (n < 0) {
 			perror("write");
@@ -292,7 +288,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 }
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
-   // printf("rpc_call called\n");
+    //printf("rpc_call called\n");
     char buffer[2000];
     char request[2000];
     int n, request_id;
@@ -311,17 +307,17 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
         sprintf(data2_elem, "%d,", *(uint8_t *)payload->data2+i);
         strcat(data2_array_str, data2_elem);
     }
-   // printf("data2 array string: %s\n", data2_array_str);
+    //("data2 array string: %s\n", data2_array_str);
     
     sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
 
-   // printf("sending request: %s\n", request);
+    //printf("sending request: %s\n", request);
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
 		perror("socket");
 		return NULL;
 	}
-   // printf("CALL request sent\n");
+    // printf("CALL request sent\n");
 
     // Get function result
     n = read(cl->sockfd, buffer, 255);
@@ -329,12 +325,12 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 
     // Check that ID of response corresponds to ID of request
     int response_id = atoi(strtok(buffer, " "));
-   // printf("response id: %d, request id: %d\n", response_id, request_id);
+    //printf("response id: %d, request id: %d\n", response_id, request_id);
     while (response_id!=request_id && n>0){
         n = read(cl->sockfd, buffer, 255);
         buffer[n] = '\0';
         response_id = atoi(strtok(buffer, " "));
-       // printf("Received function result: %s\n", buffer);
+        //printf("Received function result: %s\n", buffer);
     }
     if (response_id!=request_id) {
         return NULL;
@@ -342,32 +338,34 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
 
     // Check if function was called successfully
     char *ok_message = strtok(NULL, " ");
-   // printf("ok message: %s\n", ok_message);
+    //printf("ok message: %s\n", ok_message);
 
     atoi(strtok(NULL, " ")); // skipping over function_id
 
     if (strcmp(ok_message, "OK")==0){
         int data1 = atoi(strtok(NULL, " "));
-       // printf("data1: %d\n", data1);
+        //printf("data1: %d\n", data1);
         int data2_len = atoi(strtok(NULL, " "));
-       // printf("data2_len: %d\n", data2_len);
+        //printf("data2_len: %d\n", data2_len);
 
         // Parse data2 byte array string into appropriate format to be used by function
-        char data2_array_str[data2_len*2];
-        strcpy(data2_array_str, strtok(NULL, " "));
-       // printf("data2 array str: %s\n", data2_array_str);
-        uint8_t *data2_array = malloc(sizeof(uint8_t) * (data2_len + 1));
-        data2_array[0] = atoi(strtok(data2_array_str, ","));
-       // printf("data2_array[0]: %c\n", data2_array[0]);
-        for (int i=1; i<data2_len; i++){
-            data2_array[i] = atoi(strtok(NULL, ","));
-        }
-
         void *data2;
-        if (data2_len==0){
-            data2 = NULL;
-        } else {
+        if (data2_len>0){
+            char data2_array_str[data2_len*2 + 1];
+            //printf("blah\n");
+            strcpy(data2_array_str, strtok(NULL, " "));
+            //printf("blah\n");
+            //printf("data2 array str: %s\n", data2_array_str);
+            uint8_t *data2_array = malloc(sizeof(uint8_t) * (data2_len + 1));
+            data2_array[0] = atoi(strtok(data2_array_str, ","));
+            //printf("data2_array[0]: %c\n", data2_array[0]);
+            for (int i=1; i<data2_len; i++){
+                data2_array[i] = atoi(strtok(NULL, ","));
+            }
             data2 = data2_array;
+        }
+        else {
+            data2 = NULL;
         }
         
         // Return rpc_data struct containing result of function
@@ -379,7 +377,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
         return data;
     }
     else {
-       // printf("error calling function\n");
+        //printf("error calling function\n");
         return NULL;
     }
 }

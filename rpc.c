@@ -9,7 +9,7 @@
 
 typedef struct registered_function {
     int id;
-    char *name;
+    char name[10000];
     rpc_handler handler;
 } registered_function;
 
@@ -43,13 +43,17 @@ rpc_server *rpc_init_server(int port) {
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     registered_function *function = malloc(sizeof(registered_function));
     function->id = srv->num_functions;
-    function->name = name;
+    strcpy(function->name, name); 
     function->handler = handler;
+
+    // printf("num_functions: %d\n", srv->num_functions);
 
     srv->functions[srv->num_functions] = function;
     srv->num_functions++;
 
-    //printf("Registered function name: %s, id:%d\n", name, function->id);
+    // printf("Registered function name: %s, id:%d\n", function->name, function->id);
+    // printf("num_functions: %d\n", srv->num_functions);
+    // printf("srv->functions[srv->num_functions]->name: %s\n", srv->functions[function->id]->name);
 
     return function->id;
 }
@@ -75,7 +79,7 @@ void rpc_serve_all(rpc_server *srv) {
 		perror("accept");
 		exit(EXIT_FAILURE);
 	}
-    //printf("Accepted connection\n");
+    // printf("Accepted connection\n");
 
     while (1){
         n = read(newsockfd, buffer, 255);
@@ -89,37 +93,39 @@ void rpc_serve_all(rpc_server *srv) {
 			return;
 		}
         buffer[n] = '\0';
-        //printf("read in message %s from client\n", buffer);
+        // printf("read in message %s from client\n", buffer);
 
         // Get input from client & send a response
         char response[256];
 
         int request_id = atoi(strtok(buffer, " "));
-        //printf("request id: %d\n", request_id);
+        // printf("request id: %d\n", request_id);
 
         char *request = strtok(NULL, " ");
-        //printf("request: %s\n", request);
+        // printf("request: %s\n", request);
 
         // FIND -> find function on server
         if (strncmp("FIND", request, 4)==0){
             char *request_data = strtok(NULL, " ");
-            //printf("request data: %s\n", request_data);
+            // printf("request data: %s\n", request_data);
 
             // printf("FIND request received\n");
-            //printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
+            // printf("srv->functions[0]->name: %s\n", srv->functions[0]->name);
             int function_found = 0;
+            // printf("num_function: %d\n", srv->num_functions);
             for (int i=0; i<srv->num_functions; i++){
+                // printf("function name: %s\n", srv->functions[0]->name);
                 if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, request_data)==0){
                     // Get function id
-                    //printf("found, function id: %d\n", srv->functions[i]->id);
-                    //printf("request: %d, function id: %d\n", request_id, srv->functions[i]->id);
+                    // printf("found, function id: %d\n", srv->functions[i]->id);
+                    // printf("request: %d, function id: %d\n", request_id, srv->functions[i]->id);
                     sprintf(response, "%d OK %d", request_id, srv->functions[i]->id);
                     function_found = 1;
                     break;
                 }
             }
             if (!function_found){
-                //printf("function not found\n");
+                // printf("function not found\n");
                 sprintf(response, "%d ER", request_id);
             }
         }
@@ -206,7 +212,7 @@ rpc_client *rpc_init_client(char *addr, int port) {
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
-    //printf("rpc_find called\n");
+    // printf("rpc_find called\n");
     int n, request_id;
     char request[256];
     char buffer[256];
@@ -216,20 +222,20 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     cl->request_count++;
     sprintf(request, "%d FIND %s", request_id, name);
 
-    //printf("sending request: %s\n", request);
+    // printf("sending request: %s\n", request);
 
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
 		perror("socket");
 		return NULL;
 	}
-    //printf("FIND request sent\n");
+    // printf("FIND request sent\n");
 
     // Get response from server of form "request_id OK function_id"
-    //printf("reading response from server\n");
+    // printf("reading response from server\n");
     n = read(cl->sockfd, buffer, 255);
     buffer[n] = '\0';
-    //printf("response from server: %s\n", buffer);
+    // printf("response from server: %s\n", buffer);
 
     // Check that ID of response corresponds to ID of request
     int response_id = atoi(strtok(buffer, " "));

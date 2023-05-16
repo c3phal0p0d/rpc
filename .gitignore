@@ -2,7 +2,7 @@
 *.a
 rpc-client
 rpc-server
-test-client
-test-server
+test_client
+test_server
 cases/
 artifacts/

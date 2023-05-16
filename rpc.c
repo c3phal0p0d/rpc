@@ -166,8 +166,8 @@ void rpc_serve_all(rpc_server *srv) {
             rpc_handler handler = srv->functions[function_id]->handler;
             rpc_data *result = handler(input);
 
-            // printf("result data1: %d\n", result->data1);
-            // printf("result data2_len: %d\n", result->data2_len);
+            //printf("result data1: %d\n", result->data1);
+            //printf("result data2_len: %ld\n", result->data2_len);
             // printf("result data2: %d\n", result->data2);
 
             // Convert data2 byte array to string format
@@ -176,10 +176,10 @@ void rpc_serve_all(rpc_server *srv) {
             char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
             //strcpy(data2_array, *(uint8_t *)payload->data2);
             for (int i=0; i<result->data2_len; i++){
-                sprintf(data2_elem, "%d,", *(uint8_t *)result->data2+i);
+                sprintf(data2_elem, "%d,", *(uint8_t *)(result->data2+i));
                 strcat(result_data2_array_str, data2_elem);
             }
-            //printf("data2 array string: %s\n", result_data2_array_str);
+            //printf("result data2 array string: %s\n", result_data2_array_str);
             
             sprintf(response, "%d OK %d %d %ld %s", request_id, function_id, result->data1, result->data2_len, result_data2_array_str);
 
@@ -304,7 +304,8 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
     //strcpy(data2_array, *(uint8_t *)payload->data2);
     for (int i=0; i<payload->data2_len; i++){
-        sprintf(data2_elem, "%d,", *(uint8_t *)payload->data2+i);
+        //printf("data2_array[%d]: %d\n", i, *(uint8_t *)(payload->data2+i));
+        sprintf(data2_elem, "%d,", *(uint8_t *)(payload->data2+i));
         strcat(data2_array_str, data2_elem);
     }
     //("data2 array string: %s\n", data2_array_str);
@@ -358,9 +359,10 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
             //printf("data2 array str: %s\n", data2_array_str);
             uint8_t *data2_array = malloc(sizeof(uint8_t) * (data2_len + 1));
             data2_array[0] = atoi(strtok(data2_array_str, ","));
-            //printf("data2_array[0]: %c\n", data2_array[0]);
+            //printf("data2_array[0]: %d\n", data2_array[0]);
             for (int i=1; i<data2_len; i++){
                 data2_array[i] = atoi(strtok(NULL, ","));
+                //printf("data2_array[%d]: %d\n", i, data2_array[i]);
             }
             data2 = data2_array;
         }

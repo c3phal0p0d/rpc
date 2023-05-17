@@ -19,8 +19,124 @@ struct rpc_server {
     registered_function **functions;
 };
 
-int setup_server_socket(int port);
-int setup_client_socket(char* hostname, const int port);
+int validate_rpc_data(rpc_data *data){
+    // Check that data2_len and actual length of data2 are the same
+    if (data->data2==NULL){
+        return data->data2_len==0;
+    }
+    int actual_data2_len = 0;
+    uint8_t *elem = data->data2;
+    while (*elem) {
+        elem++;
+        actual_data2_len++;
+        if (actual_data2_len > data->data2_len){
+            return 0;
+        }
+    }
+    if (actual_data2_len<data->data2_len){
+        return 0;
+    }
+    return 1;
+}
+
+/* Adapted from workshop 9 code */
+/* Create and return a server socket bound to the given port */
+int setup_server_socket(const int port) {
+    int re, s, sockfd;
+	struct addrinfo hints, *res;
+
+	// Create address
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+    // Get addrinfo
+    //printf("port: %d\n", port);
+    char service[snprintf(NULL, 0, "%d", port) + 1];
+    sprintf(service, "%d", port);
+    //printf("service: %s\n", service);
+	s = getaddrinfo(NULL, service, &hints, &res);
+
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		return -1;
+	}
+
+	// Create socket
+	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (sockfd < 0) {
+		perror("ERROR: socket");
+		return -1;
+	}
+
+	// Reuse port if possible
+	re = 1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
+		perror("ERROR: setsockopt");
+		return -1;
+	}
+	// Bind address to the socket
+
+    int enable = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
+		perror("ERROR: bind");
+		return -1;
+	}
+    
+	freeaddrinfo(res);
+
+    return sockfd;
+}
+
+/* Create and return a client socket bound to the given port and server */
+int setup_client_socket(char* hostname, const int port) {
+    int sockfd, s;
+	struct addrinfo hints, *servinfo, *rp;
+
+    // Create address
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+
+	// Get addrinfo of server
+    //printf("port: %d\n", port);
+    char service[snprintf(NULL, 0, "%d", port) + 1];
+    sprintf(service, "%d", port);
+    //printf("service: %s\n", service);
+    //// printf("hostname: %s\n", hostname);
+	s = getaddrinfo(hostname, service, &hints, &servinfo);
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		return -1;
+	}
+
+	// Connect to first valid result
+	for (rp = servinfo; rp != NULL; rp = rp->ai_next) {
+		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sockfd == -1){
+            //printf("not valid\n");
+            continue;
+        }
+
+		if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) != -1)
+			break;
+
+		close(sockfd);
+	}
+	if (rp == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		return -1;
+	}
+
+	freeaddrinfo(servinfo);
+
+    return sockfd;
+}
 
 rpc_server *rpc_init_server(int port) {
     // Initialize socket
@@ -166,22 +282,28 @@ void rpc_serve_all(rpc_server *srv) {
             rpc_handler handler = srv->functions[function_id]->handler;
             rpc_data *result = handler(input);
 
-            //printf("result data1: %d\n", result->data1);
-            //printf("result data2_len: %ld\n", result->data2_len);
-            // printf("result data2: %d\n", result->data2);
+            // Validate result rpc_data
+            if (validate_rpc_data(result)) {
+                //printf("result data1: %d\n", result->data1);
+                //printf("result data2_len: %ld\n", result->data2_len);
+                // printf("result data2: %d\n", result->data2);
 
-            // Convert data2 byte array to string format
-            char result_data2_array_str[result->data2_len*2];
-            strcpy(result_data2_array_str, "");
-            char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
-            //strcpy(data2_array, *(uint8_t *)payload->data2);
-            for (int i=0; i<result->data2_len; i++){
-                sprintf(data2_elem, "%d,", *(uint8_t *)(result->data2+i));
-                strcat(result_data2_array_str, data2_elem);
+                // Convert data2 byte array to string format
+                char result_data2_array_str[result->data2_len*2];
+                strcpy(result_data2_array_str, "");
+                char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
+                //strcpy(data2_array, *(uint8_t *)payload->data2);
+                for (int i=0; i<result->data2_len; i++){
+                    sprintf(data2_elem, "%d,", *(uint8_t *)(result->data2+i));
+                    strcat(result_data2_array_str, data2_elem);
+                }
+                //printf("result data2 array string: %s\n", result_data2_array_str);
+                
+                sprintf(response, "%d OK %d %d %ld %s", request_id, function_id, result->data1, result->data2_len, result_data2_array_str);
+
+            } else {
+                sprintf(response, "%d ER", request_id);
             }
-            //printf("result data2 array string: %s\n", result_data2_array_str);
-            
-            sprintf(response, "%d OK %d %d %ld %s", request_id, function_id, result->data1, result->data2_len, result_data2_array_str);
 
             rpc_data_free(result);
             input->data2 = NULL;
@@ -296,21 +418,27 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // Send CALL request to server: request_id CALL function_id data1 data2_len data2 (using value from input rpc_data struct)
     request_id = cl->request_count;
 
-    // Convert data2 byte array to string format
-    //// printf("converting data2 to array string\n");
-    //uint8_t data2_array[payload->data2_len];
-    char data2_array_str[1000];
-    strcpy(data2_array_str, "");
-    char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
-    //strcpy(data2_array, *(uint8_t *)payload->data2);
-    for (int i=0; i<payload->data2_len; i++){
-        //printf("data2_array[%d]: %d\n", i, *(uint8_t *)(payload->data2+i));
-        sprintf(data2_elem, "%d,", *(uint8_t *)(payload->data2+i));
-        strcat(data2_array_str, data2_elem);
+    // Validate payload rpc_data
+    if (validate_rpc_data(payload)){
+        // Convert data2 byte array to string format
+        //// printf("converting data2 to array string\n");
+        //uint8_t data2_array[payload->data2_len];
+        char data2_array_str[1000];
+        strcpy(data2_array_str, "");
+        char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
+        //strcpy(data2_array, *(uint8_t *)payload->data2);
+        for (int i=0; i<payload->data2_len; i++){
+            //printf("data2_array[%d]: %d\n", i, *(uint8_t *)(payload->data2+i));
+            sprintf(data2_elem, "%d,", *(uint8_t *)(payload->data2+i));
+            strcat(data2_array_str, data2_elem);
+        }
+        //("data2 array string: %s\n", data2_array_str);
+        
+        sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
+
+    } else {
+        return NULL;
     }
-    //("data2 array string: %s\n", data2_array_str);
-    
-    sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
 
     //printf("sending request: %s\n", request);
     n = write(cl->sockfd, request, strlen(request));
@@ -404,103 +532,4 @@ void rpc_data_free(rpc_data *data) {
    // printf("freed data2\n");
     free(data);
    // printf("freed data\n");
-}
-
-/* Adapted from workshop 9 code */
-/* Create and return a server socket bound to the given port */
-int setup_server_socket(const int port) {
-    int re, s, sockfd;
-	struct addrinfo hints, *res;
-
-	// Create address
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-
-    // Get addrinfo
-    //printf("port: %d\n", port);
-    char service[snprintf(NULL, 0, "%d", port) + 1];
-    sprintf(service, "%d", port);
-    //printf("service: %s\n", service);
-	s = getaddrinfo(NULL, service, &hints, &res);
-
-	if (s != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-		return -1;
-	}
-
-	// Create socket
-	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (sockfd < 0) {
-		perror("ERROR: socket");
-		return -1;
-	}
-
-	// Reuse port if possible
-	re = 1;
-	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
-		perror("ERROR: setsockopt");
-		return -1;
-	}
-	// Bind address to the socket
-
-    int enable = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
-	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
-		perror("ERROR: bind");
-		return -1;
-	}
-    
-	freeaddrinfo(res);
-
-    return sockfd;
-}
-
-/* Create and return a client socket bound to the given port and server */
-int setup_client_socket(char* hostname, const int port) {
-    int sockfd, s;
-	struct addrinfo hints, *servinfo, *rp;
-
-    // Create address
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_STREAM;
-
-	// Get addrinfo of server
-    //printf("port: %d\n", port);
-    char service[snprintf(NULL, 0, "%d", port) + 1];
-    sprintf(service, "%d", port);
-    //printf("service: %s\n", service);
-    //// printf("hostname: %s\n", hostname);
-	s = getaddrinfo(hostname, service, &hints, &servinfo);
-	if (s != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-		return -1;
-	}
-
-	// Connect to first valid result
-	for (rp = servinfo; rp != NULL; rp = rp->ai_next) {
-		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (sockfd == -1){
-            //printf("not valid\n");
-            continue;
-        }
-
-		if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) != -1)
-			break;
-
-		close(sockfd);
-	}
-	if (rp == NULL) {
-		fprintf(stderr, "client: failed to connect\n");
-		return -1;
-	}
-
-	freeaddrinfo(servinfo);
-
-    return sockfd;
 }

@@ -180,15 +180,28 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
         return -1;
     }
 
+    int function_id = srv->num_functions;
+
+    // Check if function with the same name already exists, if so overwrite it with the new function
+    for (int i=0; i<srv->num_functions; i++){
+        if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, name)==0){
+            //printf("function already exists\n");
+            function_id = i;
+            break;
+        }
+    }
+
     registered_function *function = malloc(sizeof(registered_function));
-    function->id = srv->num_functions;
+    function->id = function_id;
     strcpy(function->name, name); 
     function->handler = handler;
 
-    // printf("num_functions: %d\n", srv->num_functions);
+    srv->functions[function_id] = function;
+    if (function_id==srv->num_functions){   // new function added
+        srv->num_functions++;
+    }
 
-    srv->functions[srv->num_functions] = function;
-    srv->num_functions++;
+    //printf("num_functions: %d\n", srv->num_functions);
 
     //printf("Registered function name: %s, id:%d\n", function->name, function->id);
     // printf("num_functions: %d\n", srv->num_functions);

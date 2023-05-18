@@ -21,11 +21,21 @@ struct rpc_server {
 
 int validate_rpc_data(rpc_data *data){
     // Check that data2_len and actual length of data2 are the same
-    //printf("data2_len: %ld\n", data->data2_len);
-    if (data->data2_len>0 && data->data2==NULL){
+    //printf("validating rpc_data\n");
+    if (data==NULL){
+        //printf("data==NULL\n");
+        return 0;
+    }
+    else if (data->data2_len<0){
+        //printf("data2_len<0\n");
+        return 0;
+    }
+    else if (data->data2_len>0 && data->data2==NULL){
+        //printf("data2_len>0, data2==NULL\n");
         return 0;
     }
     else if (data->data2_len==0 && data->data2!=NULL){
+        //printf("data2_len==0, data2!=NULL\n");
         return 0;
     }
     return 1;
@@ -165,6 +175,11 @@ rpc_server *rpc_init_server(int port) {
 }
 
 int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
+    // Check for valid inputs
+    if (name==NULL || srv==NULL || handler==NULL){
+        return -1;
+    }
+
     registered_function *function = malloc(sizeof(registered_function));
     function->id = srv->num_functions;
     strcpy(function->name, name); 
@@ -175,7 +190,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
     srv->functions[srv->num_functions] = function;
     srv->num_functions++;
 
-    // printf("Registered function name: %s, id:%d\n", function->name, function->id);
+    //printf("Registered function name: %s, id:%d\n", function->name, function->id);
     // printf("num_functions: %d\n", srv->num_functions);
     // printf("srv->functions[srv->num_functions]->name: %s\n", srv->functions[function->id]->name);
 
@@ -292,6 +307,7 @@ void rpc_serve_all(rpc_server *srv) {
 
             // Validate result rpc_data
             if (validate_rpc_data(result)) {
+                //printf("result rpc_data is valid\n");
                 //printf("result data1: %d\n", result->data1);
                 //printf("result data2_len: %ld\n", result->data2_len);
                 // printf("result data2: %d\n", result->data2);
@@ -310,6 +326,7 @@ void rpc_serve_all(rpc_server *srv) {
                 sprintf(response, "%d OK %d %d %ld %s", request_id, function_id, result->data1, result->data2_len, result_data2_array_str);
 
             } else {
+                //printf("invalid input rpc_data\n");
                 sprintf(response, "%d ER", request_id);
             }
 
@@ -357,17 +374,22 @@ rpc_client *rpc_init_client(char *addr, int port) {
 }
 
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
-   // printf("rpc_find called\n");
+    //printf("rpc_find called\n");
     int n, request_id;
     char request[256];
     char buffer[256];
+
+    // Make sure inputs are not null
+    if (name==NULL || cl == NULL){
+        return NULL;
+    }
 
     // Send FIND request to server: single message of form "request_id FIND name"
     request_id = cl->request_count;
     cl->request_count++;
     sprintf(request, "%d FIND %s", request_id, name);
 
-   // printf("sending request: %s\n", request);
+    //printf("sending request: %s\n", request);
 
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
@@ -380,7 +402,7 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     //// printf("reading response from server\n");
     n = read(cl->sockfd, buffer, 255);
     buffer[n] = '\0';
-   // printf("response from server: %s\n", buffer);
+    //printf("response from server: %s\n", buffer);
 
     // Check that ID of response corresponds to ID of request
     int response_id = atoi(strtok(buffer, " "));
@@ -422,12 +444,18 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     char buffer[2000];
     char request[2000];
     int n, request_id;
+
+    // Make sure inputs are not null
+    if (cl == NULL || h == NULL || payload == NULL){
+        return NULL;
+    }
  
     // Send CALL request to server: request_id CALL function_id data1 data2_len data2 (using value from input rpc_data struct)
     request_id = cl->request_count;
 
     // Validate payload rpc_data
     if (validate_rpc_data(payload)){
+        //printf("input rpc_data valid is valid\n");
         // Convert data2 byte array to string format
         //// printf("converting data2 to array string\n");
         //uint8_t data2_array[payload->data2_len];
@@ -443,8 +471,8 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
         //("data2 array string: %s\n", data2_array_str);
         
         sprintf(request, "%d CALL %d %d %ld %s", request_id, h->function_id, payload->data1, payload->data2_len, data2_array_str);
-
     } else {
+        //printf("invalid input rpc_data\n");
         return NULL;
     }
 

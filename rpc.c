@@ -7,9 +7,12 @@
 #include <unistd.h> 
 #include "rpc.h"
 
+#define MAX_FUNCTION_NAME_LEN 10000
+#define MAX_PROTOCOL_MESSAGE_LEN 100050
+
 typedef struct registered_function {
     int id;
-    char name[10000];
+    char name[MAX_FUNCTION_NAME_LEN];
     rpc_handler handler;
 } registered_function;
 
@@ -39,22 +42,6 @@ int validate_rpc_data(rpc_data *data){
         return 0;
     }
     return 1;
-    // int actual_data2_len = 0;
-    // uint8_t *elem = data->data2;
-    // printf("elem: %d\n", *elem);
-    // while (*elem) {
-    //     elem++;
-    //     printf("elem: %d\n", *elem);
-    //     actual_data2_len++;
-    //     if (actual_data2_len > data->data2_len){
-    //         printf("actual data2_len: %d\n", actual_data2_len);
-    //         return 0;
-    //     }
-    // }
-    // if (actual_data2_len<data->data2_len){
-    //     printf("actual data2_len: %d\n", actual_data2_len);
-    //     return 0;
-    // }
 }
 
 /* Adapted from workshop 9 code */
@@ -77,32 +64,32 @@ int setup_server_socket(const int port) {
 	s = getaddrinfo(NULL, service, &hints, &res);
 
 	if (s != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		//fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
 		return -1;
 	}
 
 	// Create socket
 	sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (sockfd < 0) {
-		perror("ERROR: socket");
+		//perror("ERROR: socket");
 		return -1;
 	}
 
 	// Reuse port if possible
 	re = 1;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &re, sizeof(int)) < 0) {
-		perror("ERROR: setsockopt");
+		//perror("ERROR: setsockopt");
 		return -1;
 	}
 	// Bind address to the socket
 
     int enable = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
-        perror("setsockopt");
+        //perror("setsockopt");
         exit(EXIT_FAILURE);
     }
 	if (bind(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
-		perror("ERROR: bind");
+		//perror("ERROR: bind");
 		return -1;
 	}
     
@@ -129,7 +116,7 @@ int setup_client_socket(char* hostname, const int port) {
     //// printf("hostname: %s\n", hostname);
 	s = getaddrinfo(hostname, service, &hints, &servinfo);
 	if (s != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		//fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
 		return -1;
 	}
 
@@ -147,7 +134,7 @@ int setup_client_socket(char* hostname, const int port) {
 		close(sockfd);
 	}
 	if (rp == NULL) {
-		fprintf(stderr, "client: failed to connect\n");
+		//fprintf(stderr, "client: failed to connect\n");
 		return -1;
 	}
 
@@ -180,6 +167,10 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
         return -1;
     }
 
+    if (strlen(name)>10000){
+        return -1;
+    }
+
     int function_id = srv->num_functions;
 
     // Check if function with the same name already exists, if so overwrite it with the new function
@@ -187,6 +178,7 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
         if (srv->functions[i]!=NULL && strcmp(srv->functions[i]->name, name)==0){
             //printf("function already exists\n");
             function_id = i;
+            free(srv->functions[i]);    // free memory of overwritten function
             break;
         }
     }
@@ -213,13 +205,13 @@ int rpc_register(rpc_server *srv, char *name, rpc_handler handler) {
 void rpc_serve_all(rpc_server *srv) {
    // printf("Serving all....\n");
     int sockfd, newsockfd, n;
-    char buffer[256];
+    char buffer[MAX_PROTOCOL_MESSAGE_LEN];
     sockfd = srv->sockfd;
 
     // Listen on socket for connections
     if (listen(sockfd, 5) < 0) {
-        perror("ERROR: listen");
-        exit(EXIT_FAILURE);
+        //perror("ERROR: listen");
+        return;
     }
 
     // Accept connection
@@ -228,27 +220,27 @@ void rpc_serve_all(rpc_server *srv) {
     client_addr_size = sizeof client_addr;
 	newsockfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_addr_size);
 	if (newsockfd < 0) {
-		perror("accept");
-		exit(EXIT_FAILURE);
+		//perror("accept");
+		return;
 	}
     //// printf("Accepted connection\n");
 
     while (1){
-        n = read(newsockfd, buffer, 255);
+        n = read(newsockfd, buffer, MAX_PROTOCOL_MESSAGE_LEN);
 
         if (n==0){
              continue;
         }
 
 		if (n < 0) {
-			perror("ERROR reading from socket");
+			//perror("ERROR reading from socket");
 			return;
 		}
         buffer[n] = '\0';
         //printf("read in message %s from client\n", buffer);
 
         // Get input from client & send a response
-        char response[256];
+        char response[MAX_PROTOCOL_MESSAGE_LEN];
 
         int request_id = atoi(strtok(buffer, " "));
         //printf("request id: %d\n", request_id);
@@ -352,8 +344,8 @@ void rpc_serve_all(rpc_server *srv) {
         //printf("Sent response %s\n", response);
         n = write(newsockfd, response, strlen(response));
 		if (n < 0) {
-			perror("write");
-			exit(EXIT_FAILURE);
+			//perror("write");
+			return;
 		}
 
     // close(newsockfd);
@@ -389,8 +381,8 @@ rpc_client *rpc_init_client(char *addr, int port) {
 rpc_handle *rpc_find(rpc_client *cl, char *name) {
     //printf("rpc_find called\n");
     int n, request_id;
-    char request[256];
-    char buffer[256];
+    char request[MAX_PROTOCOL_MESSAGE_LEN];
+    char buffer[MAX_PROTOCOL_MESSAGE_LEN];
 
     // Make sure inputs are not null
     if (name==NULL || cl == NULL){
@@ -406,14 +398,14 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
     n = write(cl->sockfd, request, strlen(request));
 	if (n < 0) {
-		perror("socket");
+        //perror("socket");
 		return NULL;
 	}
     //// printf("FIND request sent\n");
-
+    
     // Get response from server of form "request_id OK function_id"
     //// printf("reading response from server\n");
-    n = read(cl->sockfd, buffer, 255);
+    n = read(cl->sockfd, buffer, MAX_PROTOCOL_MESSAGE_LEN);
     buffer[n] = '\0';
     //printf("response from server: %s\n", buffer);
 
@@ -454,8 +446,8 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
 
 rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     //printf("rpc_call called\n");
-    char buffer[2000];
-    char request[2000];
+    char buffer[MAX_PROTOCOL_MESSAGE_LEN];
+    char request[MAX_PROTOCOL_MESSAGE_LEN];
     int n, request_id;
 
     // Make sure inputs are not null
@@ -472,7 +464,7 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
         // Convert data2 byte array to string format
         //// printf("converting data2 to array string\n");
         //uint8_t data2_array[payload->data2_len];
-        char data2_array_str[1000];
+        char data2_array_str[payload->data2_len*2+1];
         strcpy(data2_array_str, "");
         char data2_elem[snprintf(NULL, 0, "%d,", 1) + 1];
         //strcpy(data2_array, *(uint8_t *)payload->data2);
@@ -498,14 +490,14 @@ rpc_data *rpc_call(rpc_client *cl, rpc_handle *h, rpc_data *payload) {
     // printf("CALL request sent\n");
 
     // Get function result
-    n = read(cl->sockfd, buffer, 255);
+    n = read(cl->sockfd, buffer, MAX_PROTOCOL_MESSAGE_LEN);
     buffer[n] = '\0';
 
     // Check that ID of response corresponds to ID of request
     int response_id = atoi(strtok(buffer, " "));
     //printf("response id: %d, request id: %d\n", response_id, request_id);
     while (response_id!=request_id && n>0){
-        n = read(cl->sockfd, buffer, 255);
+        n = read(cl->sockfd, buffer, MAX_PROTOCOL_MESSAGE_LEN);
         buffer[n] = '\0';
         response_id = atoi(strtok(buffer, " "));
         //printf("Received function result: %s\n", buffer);

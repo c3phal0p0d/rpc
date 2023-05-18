@@ -44,16 +44,18 @@ Structure of protocol messages:
         - If function is called without errors: request_id OK data1 data2_len data2 (using value from output rpc_data struct)
         - If error occurs: request_id ER 
     - Client confirmation upon receiving server response: request_id RECV
+    - Since the request data is converted into a string on the sending end and then converted back to an integer on the receiving end, the fact that data2_len is of the system-dependent type size_t does not impact anything
 
 Error handling:
+- Errors relating to protocol requests FIND and CALL:
+    - As described previously, a message of the form request_id ER will be sent if issues arise when finding/calling functions on the server
 - Invalid inputs:
-    - Check for data2_len and the actual length of data2 being the same
+    - Checks for data2_len and the actual length of data2 being the same
+    - Checks for NULL inputs
 - Lost packets:
-    - As described above, three messages are sent per successful request, so if one of them is missing it will indicate the loss of a packet
+    - As described previously, three messages are sent per successful request, so if one of them is missing it will indicate the loss of a packet
     - Timer of 5s on client-side for receiving response message from server, and similar timer on server-side for receiving confirmation message from client
     - If message is not received before timeout, then the previous message will be sent again
 - Packet duplication:
     - Server and client will keep a record of what messages belonging to a particular request have been received so far
     - If a duplicate message arrives, it will therefore be detected as a copy of a message that has already been received
-- Errors relating to protocol requests FIND and CALL:
-    - As described above, a message of the form request_id ER will be sent if issues arise when finding/calling functions on the server

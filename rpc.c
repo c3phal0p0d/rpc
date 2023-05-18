@@ -21,22 +21,30 @@ struct rpc_server {
 
 int validate_rpc_data(rpc_data *data){
     // Check that data2_len and actual length of data2 are the same
-    if (data->data2==NULL){
-        return data->data2_len==0;
+    //printf("data2_len: %ld\n", data->data2_len);
+    if (data->data2_len>0 && data->data2==NULL){
+        return 0;
     }
-    int actual_data2_len = 0;
-    uint8_t *elem = data->data2;
-    while (*elem) {
-        elem++;
-        actual_data2_len++;
-        if (actual_data2_len > data->data2_len){
-            return 0;
-        }
-    }
-    if (actual_data2_len<data->data2_len){
+    else if (data->data2_len==0 && data->data2!=NULL){
         return 0;
     }
     return 1;
+    // int actual_data2_len = 0;
+    // uint8_t *elem = data->data2;
+    // printf("elem: %d\n", *elem);
+    // while (*elem) {
+    //     elem++;
+    //     printf("elem: %d\n", *elem);
+    //     actual_data2_len++;
+    //     if (actual_data2_len > data->data2_len){
+    //         printf("actual data2_len: %d\n", actual_data2_len);
+    //         return 0;
+    //     }
+    // }
+    // if (actual_data2_len<data->data2_len){
+    //     printf("actual data2_len: %d\n", actual_data2_len);
+    //     return 0;
+    // }
 }
 
 /* Adapted from workshop 9 code */

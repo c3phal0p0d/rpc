@@ -6,24 +6,19 @@ Student ID: 1145264
 
 ANSWERS TO QUESTIONS
 1. Should the server accept calls from everyone, or just a subset of users?
-In general it would be best to restrict server calls to a subset of users in order to prevent it from being overloaded or misused. 
-If the server does accept calls from everyone, it would need to somehow restrict the number of calls that can be made per user in order to prevent the theoretical possibility of spam/denial of service attacks.
-However, this would ultimately depend on the purpose of the server and the kinds of functions it has registered.
+In general it would be best to restrict server calls to a subset of users in order to prevent it from being overloaded or misused. If the server does accept calls from everyone, it would need to somehow restrict the number of calls that can be made per user in order to prevent the possibility of spam/denial of service attacks. However, this would ultimately depend on the purpose of the server and the kinds of functions it has registered.
 
 2. Should authentication etc. be provided by the RPC framework, or by the functions that use the RPC framework?
-If the server is restricted to a subset of users then the RPC framework would obviously require authentication to prevent other people from using it.
-If not, authentication for certain functions that require it should be provided by the functions themselves, since authentication may only be necessary for specific kinds of functions (e.g. accessing files with restricted permissions)
+If the server is restricted to a subset of users then the RPC framework itself would obviously require authentication to prevent other people from using it. If not, authentication for certain functions that require it should be provided by the functions themselves, since authentication may only be necessary for specific kinds of functions (e.g. accessing files with restricted permissions)
 
 3. What transport layer protocol should be used? What are the trade-offs?
-Out of the two transport layer protocols TCP and UDP, TCP should be used for the RPC system. 
-This is because it establishes a reliable connection and has an in-built method for dealing with packet loss & duplication, which is very important for the RPC system where each packet contains important information.
-In contrast, UDP does not particularly care whether packets are lost thus making it a poor choice for this situation.
+Out of the two transport layer protocols TCP and UDP, TCP should be used for the RPC system. This is because it establishes a reliable connection and has an in-built method for dealing with packet loss & duplication, which is very important for the RPC system where each packet contains important information. In contrast, UDP does not particularly care whether packets are lost thus making it a poor choice for this situation.
 
 4. In which function(s) should the socket(s) be created?
 The sockets should be created in rpc_init_server and rpc_init_client as part of the initialization process, and then later used on the server side by rpc_serve_all and on the client side by rpc_find and rpc_call.
 
 5. Should rpc_client and rpc_server be allocated dynamically or statically? What are the implications for the client and server code?
-They should be allocated dynamically, and therefore ideally their memory must be correspondingly freed in the client and server code.
+They should be allocated dynamically, and therefore ideally their memory must be correspondingly freed in the client and server code to prevent memory leaks.
 
 6. What happens if one host uses big-endian byte order and the other uses little-endian? How does that relate to “network byte order”?
 Network byte order is big-endian. If a host uses little-endian byte order, it must first be converted to big-endian before being transmitted over the network.
@@ -34,10 +29,11 @@ PROTOCOL DESIGN
 Structure of protocol messages:
 - Each protocol request message is sent in string format
 - Request have a request_id, which is an integer corresponding to that particular request & the server's response to it. It is used to ensure that responses from the server correspond to the correct request.
+- FIND: find function on server, returning its ID if found
     - Client request: request_id FIND name
     - Server response: 
-        - If found: request_id OK function_id
-        - If not found: request_id ER
+        - If function is found: request_id OK function_id
+        - If function is not found: request_id ER
 - CALL: Call function on server, returning its result
     - Client request: request_id CALL function_id data1 data2_len data2 (using value from the rpc_data payload)
     - Server response: 
@@ -50,7 +46,7 @@ Error handling:
 - Errors relating to protocol requests FIND and CALL:
     - As described previously, a message of the form request_id ER will be sent if issues arise when finding/calling functions on the server
 - Invalid inputs:
-    - Checks for data2_len and the actual length of data2 being the same
+    - Ensures data2_len and the actual length of data2 are correct e.g. if data2 is NULL, data2_len should be 0
     - Checks for NULL inputs
 - Lost packets & packet duplication:
     - Since the choice of transport layer protocol for this RPC system is TCP, the application itself does not need to handle packet loss/duplication. This is because TCP is a reliable protocol with built-in detection & mitigation of issues like packet loss/duplication through the use of acknowledgement messages to confirm that packets have been successfully sent/received.

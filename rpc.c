@@ -417,18 +417,21 @@ rpc_handle *rpc_find(rpc_client *cl, char *name) {
     }
 
     // Check if function was found
-    char ok_message[3];
-    strncpy(ok_message, buffer + 2, 2);
-    ok_message[2] = '\0';
+    char *ok_message = strtok(NULL, " ");
+
+    // char ok_message[3];
+    // strncpy(ok_message, buffer + 2, 2);
+    // ok_message[2] = '\0';
     //printf("ok message: %s\n", ok_message);
 
     if (strcmp(ok_message, "OK")==0){
         // Get function id from response
-        char function_id_str[3];
-        strncpy(function_id_str, buffer + 5, n-5);
-        function_id_str[n-5] = '\0';
-        int function_id = atoi(function_id_str);
-       // printf("Function found with id: %d\n", function_id);
+
+        // char function_id_str[3];
+        // strncpy(function_id_str, buffer + 5, n-5);
+        // function_id_str[n-5] = '\0';
+        int function_id = atoi(strtok(NULL, " "));
+        // printf("Function found with id: %d\n", function_id);
         
         // Return handle corresponding to function
         rpc_handle *handle = malloc(sizeof(rpc_handle));

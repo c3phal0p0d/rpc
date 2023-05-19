@@ -17,7 +17,7 @@ If not, authentication for certain functions that require it should be provided 
 3. What transport layer protocol should be used? What are the trade-offs?
 Out of the two transport layer protocols TCP and UDP, TCP should be used for the RPC system. 
 This is because it establishes a reliable connection and has an in-built method for dealing with packet loss & duplication, which is very important for the RPC system where each packet contains important information.
-In contrast, UDP does not particularly care whether packets are lost thus making it a poorer choice for this situation.
+In contrast, UDP does not particularly care whether packets are lost thus making it a poor choice for this situation.
 
 4. In which function(s) should the socket(s) be created?
 The sockets should be created in rpc_init_server and rpc_init_client as part of the initialization process, and then later used on the server side by rpc_serve_all and on the client side by rpc_find and rpc_call.
@@ -32,7 +32,8 @@ Network byte order is big-endian. If a host uses little-endian byte order, it mu
 
 PROTOCOL DESIGN
 Structure of protocol messages:
-- Each protocol request has a request_id, which is an integer corresponding to that particular request. It is used to ensure that responses from the server correspond to the correct request.
+- Each protocol request message is sent in string format
+- Request have a request_id, which is an integer corresponding to that particular request & the server's response to it. It is used to ensure that responses from the server correspond to the correct request.
     - Client request: request_id FIND name
     - Server response: 
         - If found: request_id OK function_id
@@ -42,7 +43,8 @@ Structure of protocol messages:
     - Server response: 
         - If function is called without errors: request_id OK data1 data2_len data2 (using values from the rpc_data output of the function handler)
         - If error occurs: request_id ER 
-    - Since the request data is converted into a string on the sender end and then converted back to an integer on the receiver end, the fact that data2_len is of the system-dependent type size_t should not impact anything
+- Since the request data is converted into a string on the sender end and then converted back to an integer on the receiver end, the fact that data2_len is of the system-dependent type size_t should not impact anything
+- The data being in the form of a string also means that there is no conversion to network byte order of data1 and data2_len when being sent across the sockets
 
 Error handling:
 - Errors relating to protocol requests FIND and CALL:

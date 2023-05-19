@@ -16,8 +16,8 @@ If not, authentication for certain functions that require it should be provided 
 
 3. What transport layer protocol should be used? What are the trade-offs?
 Out of the two transport layer protocols TCP and UDP, TCP should be used for the RPC system. 
-This is because it establishes a reliable connection and deals with packet loss, which is very important for the RPC system where each packet contains important information.
-In contrast, UDP does not particularly care whether packets are lost thus making it more unreliable.
+This is because it establishes a reliable connection and has an in-built method for dealing with packet loss & duplication, which is very important for the RPC system where each packet contains important information.
+In contrast, UDP does not particularly care whether packets are lost thus making it a poorer choice for this situation.
 
 4. In which function(s) should the socket(s) be created?
 The sockets should be created in rpc_init_server and rpc_init_client as part of the initialization process, and then later used on the server side by rpc_serve_all and on the client side by rpc_find and rpc_call.
@@ -32,19 +32,17 @@ Network byte order is big-endian. If a host uses little-endian byte order, it mu
 
 PROTOCOL DESIGN
 Structure of protocol messages:
-- Each protocol request has a request_id, which is an integer corresponding to that particular request. It is used to ensure that responses from the server correspond correctly to the client's request.
+- Each protocol request has a request_id, which is an integer corresponding to that particular request. It is used to ensure that responses from the server correspond to the correct request.
     - Client request: request_id FIND name
     - Server response: 
         - If found: request_id OK function_id
         - If not found: request_id ER
-    - Client confirmation upon receiving server response: request_id RECV
 - CALL: Call function on server, returning its result
-    - Client request: request_id CALL function_id data1 data2_len data2 (using value from input rpc_data struct)
+    - Client request: request_id CALL function_id data1 data2_len data2 (using value from the rpc_data payload)
     - Server response: 
-        - If function is called without errors: request_id OK data1 data2_len data2 (using value from output rpc_data struct)
+        - If function is called without errors: request_id OK data1 data2_len data2 (using values from the rpc_data output of the function handler)
         - If error occurs: request_id ER 
-    - Client confirmation upon receiving server response: request_id RECV
-    - Since the request data is converted into a string on the sending end and then converted back to an integer on the receiving end, the fact that data2_len is of the system-dependent type size_t does not impact anything
+    - Since the request data is converted into a string on the sender end and then converted back to an integer on the receiver end, the fact that data2_len is of the system-dependent type size_t should not impact anything
 
 Error handling:
 - Errors relating to protocol requests FIND and CALL:
@@ -52,10 +50,5 @@ Error handling:
 - Invalid inputs:
     - Checks for data2_len and the actual length of data2 being the same
     - Checks for NULL inputs
-- Lost packets:
-    - As described previously, three messages are sent per successful request, so if one of them is missing it will indicate the loss of a packet
-    - Timer of 5s on client-side for receiving response message from server, and similar timer on server-side for receiving confirmation message from client
-    - If message is not received before timeout, then the previous message will be sent again
-- Packet duplication:
-    - Server and client will keep a record of what messages belonging to a particular request have been received so far
-    - If a duplicate message arrives, it will therefore be detected as a copy of a message that has already been received
+- Lost packets & packet duplication:
+    - Since the choice of transport layer protocol for this RPC system is TCP, the application itself does not need to handle packet loss/duplication. This is because TCP is a reliable protocol with built-in detection & mitigation of issues like packet loss/duplication through the use of acknowledgement messages to confirm that packets have been successfully sent/received.
